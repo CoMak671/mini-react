@@ -1,4 +1,5 @@
 import { findDomByVNode, updateDOMTree } from './react-dom';
+import { deepClone } from './utils';
 
 export const updaterQueue = {
   isBatch: false,
@@ -28,14 +29,30 @@ class Updater {
       this.launchUpdate();
     }
   }
-  launchUpdate() {
+  launchUpdate(nextProps) {
     const { ClassComponent, pendingState } = this;
-    if (pendingState.length === 0) return;
-    ClassComponent.state = this.pendingState.reduce((preState, newState) => {
+    if (pendingState.length === 0 && !nextProps) return;
+    let isShouldUpdate = true;
+
+    let prevProps = deepClone(ClassComponent.props);
+    let prevState = deepClone(ClassComponent.state);
+
+    let nextState = this.pendingState.reduce((preState, newState) => {
       return { ...preState, ...newState };
     }, ClassComponent.state);
+
+    if (ClassComponent.shouldComponentUpdate) {
+      isShouldUpdate = ClassComponent.shouldComponentUpdate(
+        nextProps,
+        nextState
+      );
+    }
+
+    ClassComponent.state = nextState;
+    if (nextProps) ClassComponent.props = nextProps;
     this.pendingState.length = 0;
-    ClassComponent.update();
+
+    if (isShouldUpdate) ClassComponent.update(prevProps, prevState);
   }
 }
 
@@ -55,14 +72,29 @@ export class Component {
     this.updater.addState(partialState);
   }
 
-  update() {
+  update(prevProps, prevState) {
     // 1. 获取重新执行render函数后的虚拟DOM -> 新虚拟DOM
     // 2. 根据新虚拟DOM生成真实DOM
     // 3. 将真实DOM挂在到页面上
     let oldVNode = this.oldVNode; // TODO: 让类组件拥有一个oldVNode保存类组件实例对应的虚拟DOM
     let oldDom = findDomByVNode(oldVNode); // TODO: 将真实DOM保存到对应虚拟DOM上
+    if (this.constructor.getDerivedStateFromProps) {
+      let newState = this.constructor.getDerivedStateFromProps(
+        this.props,
+        this.state
+      );
+      this.state = { ...this.state, ...newState };
+    }
+
+    let snapshot = this.getSnapshotBeforeUpdate
+      ? this.getSnapshotBeforeUpdate(prevProps, prevState)
+      : null;
+
     let newVNode = this.render();
-    updateDOMTree(oldDom, newVNode);
+    updateDOMTree(oldVNode, newVNode, oldDom);
     this.oldVNode = newVNode;
+    if (this.componentDidUpdate) {
+      this.componentDidUpdate(this.props, this.state, snapshot);
+    }
   }
 }

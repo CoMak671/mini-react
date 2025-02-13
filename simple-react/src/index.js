@@ -1,74 +1,79 @@
-// import React from 'react';
-// import ReactDOM from 'react-dom';
+import React, {
+  useState,
+  useReducer,
+  useEffect,
+  useRef,
+  useImperativeHandle,
+  useMemo,
+  useCallback,
+} from './react';
+import ReactDom from './react-dom';
 
-import React from './react';
-import ReactDOM from './react-dom';
-
-function MyFunctionComponent(props) {
-  return (
-    <div style={{ color: 'red' }}>
-      hello simple react
-      <div>child1</div>
-      <div>child2</div>
-    </div>
-  );
-}
-
-class MyClassComponent extends React.Component {
-  constructor(props) {
-    super(props);
-
-    this.state = { xxx: '999' };
-
-    // setTimeout(() => {
-    //   this.setState({ xxx: '888' });
-    // }, 3000);
-  }
-
-  updateShowText(newText) {
-    this.setState({ xxx: newText });
-  }
-
-  render() {
-    return (
-      <div style={{ color: 'red' }}>
-        hello simple react
-        <div>{this.props.xx}</div>
-        <div onClick={() => this.updateShowText(this.state.xxx + 'a')}>
-          {this.state.xxx}
-        </div>
-      </div>
-    );
+function reducer(state, action) {
+  switch (action.type) {
+    case 'increment':
+      return { age: state.age + 1 };
+    case 'decrement':
+      return { age: state.age - 1 };
+    default:
+      return state;
   }
 }
 
-const ForwardRefFunctionComponent = React.forwardRef((props, ref) => {
-  return <input ref={ref}>ForwardRefFunctionComponent</input>;
-});
+function Counter() {
+  const [count, setCount] = useState(0);
+  const [state, dispatch] = useReducer(reducer, { age: 42 });
 
-function FunctionComponent() {
-  let forwardRef = React.createRef();
-  let classRef = React.createRef();
-  let elementRef = React.createRef();
+  const combine = { count };
 
-  const changeInput = () => {
-    forwardRef.current.value = 'ForwardRef...';
-    classRef.current.updateShowText('100');
-    elementRef.current.value = '...';
+  const memoCombine = useMemo(() => ({ count }), [count]);
+
+  const handleClick = () => {
+    setCount(count + 1);
   };
+
+  const handleDispatch = useCallback(() => {
+    dispatch({ type: 'increment' });
+  }, []);
+
+  useEffect(() => {
+    console.log('effect', count);
+    return () => {
+      console.log('destroy', count);
+    };
+  }, [count]);
 
   return (
     <div>
-      <ForwardRefFunctionComponent ref={forwardRef} />
-      <br />
-      <input ref={elementRef} />
-      <br />
-      <input type="button" onClick={changeInput} value={'点击加省略号'} />
-      <br />
-      <MyClassComponent ref={classRef} />
-      <br />
+      <button onClick={handleClick}>计数器++{count}</button>
+      <button onClick={() => handleDispatch()}>年龄++{state.age}</button>
     </div>
   );
 }
 
-ReactDOM.render(<FunctionComponent />, document.getElementById('root'));
+const MyInput = React.forwardRef((props, ref) => {
+  const inputRef = useRef();
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      inputRef.current.focus();
+    },
+  }));
+
+  return <input {...props} ref={inputRef} />;
+});
+
+function Form() {
+  const inputRef = useRef();
+  function handleClick() {
+    inputRef.current.focus();
+  }
+  return (
+    <div>
+      <MyInput ref={inputRef} />
+      <button onClick={handleClick}>focus</button>
+    </div>
+  );
+}
+
+ReactDom.render(<Counter />, document.getElementById('root'));
